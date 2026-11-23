@@ -49,20 +49,32 @@
           <label>Copies
             <input name="copies" type="number" required min="1" step="1" value="1">
           </label>
+          <div id="dynamic-fields"></div>
         </div>
-        <button type="submit" disabled>Printing will be available in Phase 2</button>
+        <div class="actions"><button type="button" id="preview">Preview</button><button type="submit" id="print">Print</button></div>
+        <p id="status" role="status"></p>
+        <img id="preview-image" alt="Label preview">
+        <section><h2>My print history</h2><div id="history"></div></section>
       </form>
     <% } %>
   </main>
   <% if (!errorMessage) { %>
     <script>
-      document.querySelector('select[name="printer"]').addEventListener('change', function(event) {
-        fetch('/preferences/printer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ printer: event.target.value })
-        });
-      });
+      const printer = document.querySelector('select[name="printer"]');
+      const label = document.querySelector('select[name="label"]');
+      const form = document.querySelector('form');
+      const status = document.querySelector('#status');
+      const dynamic = document.querySelector('#dynamic-fields');
+      let fieldNames = [];
+      const payload = () => ({ printer: printer.value, label: label.value, copies: document.querySelector('[name="copies"]').value, data: Object.fromEntries(fieldNames.map((name) => { const input = [...form.elements].find((element) => element.name === name); return [name, input.value]; })) });
+      const api = async (url, options) => { const response = await fetch(url, options); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Request failed.'); return data; };
+      printer.addEventListener('change', (event) => { fetch('/preferences/printer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ printer: event.target.value }) }); });
+      async function loadFields() { try { const data = await api(`/form-fields/${encodeURIComponent(label.value)}`); fieldNames = data.fields; dynamic.innerHTML = ''; data.fields.forEach((name) => { if ([...form.elements].some((element) => element.name === name)) return; const field = document.createElement('label'); field.textContent = name; const input = document.createElement('input'); input.name = name; input.required = true; input.maxLength = 500; field.append(input); dynamic.append(field); }); } catch (error) { status.textContent = error.message; } }
+      label.addEventListener('change', loadFields);
+      document.querySelector('#preview').addEventListener('click', async () => { if (!form.reportValidity()) return; try { const data = await api('/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload()) }); document.querySelector('#preview-image').src = `data:image/png;base64,${data.img}`; status.textContent = ''; } catch (error) { status.textContent = error.message; } });
+      form.addEventListener('submit', async (event) => { event.preventDefault(); if (!form.reportValidity()) return; try { const data = await api('/print', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload()) }); status.textContent = `${data.jobs.length} print job(s) sent.`; history(); } catch (error) { status.textContent = error.message; } });
+      async function history() { try { const jobs = await api('/history'); const box = document.querySelector('#history'); box.innerHTML = ''; jobs.forEach((job) => { const button = document.createElement('button'); button.type = 'button'; button.textContent = `${job.date}: ${job.label_name}`; button.onclick = async () => { printer.value = job.printer_id; label.value = job.label_id; await loadFields(); Object.entries(job.data).forEach(([name, value]) => { const input = [...form.elements].find((element) => element.name === name); if (input) input.value = value; }); }; box.append(button); }); } catch (error) { status.textContent = error.message; } }
+      history();
     </script>
   <% } %>
 </body>
