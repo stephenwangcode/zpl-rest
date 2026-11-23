@@ -30,10 +30,23 @@ function fetchCollection(apiUrl, endpoint) {
   });
 }
 
+function getCookie(request, name) {
+  const cookies = (request.headers.cookie || '').split(';');
+  const prefix = `${name}=`;
+  const cookie = cookies.map((item) => item.trim()).find((item) => item.startsWith(prefix));
+  if (!cookie) return null;
+  try {
+    return decodeURIComponent(cookie.slice(prefix.length));
+  } catch (error) {
+    return null;
+  }
+}
+
 function createApp({ apiUrl = process.env.ZPL_API_URL || 'http://10.1.1.246:8110' } = {}) {
   const app = express();
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, 'views'));
+  app.use(express.json());
   app.use(express.static(path.join(__dirname, 'public')));
 
   app.get('/', async (request, response) => {
@@ -42,10 +55,24 @@ function createApp({ apiUrl = process.env.ZPL_API_URL || 'http://10.1.1.246:8110
         fetchCollection(apiUrl, '/rest/printer'),
         fetchCollection(apiUrl, '/rest/label')
       ]);
-      response.render('index', { printers, labels, errorMessage: null });
+      const savedPrinterId = getCookie(request, 'employee_printer');
+      const selectedPrinterId = printers.some((printer) => printer._id === savedPrinterId) ? savedPrinterId : null;
+      response.render('index', { printers, labels, selectedPrinterId, errorMessage: null });
     } catch (error) {
       console.error(`Unable to load employee portal data: ${error.message}`);
-      response.status(503).render('index', { printers: [], labels: [], errorMessage: 'Unable to load printers and label templates. Please try again later.' });
+      response.status(503).render('index', { printers: [], labels: [], selectedPrinterId: null, errorMessage: 'Unable to load printers and label templates. Please try again later.' });
+    }
+  });
+
+  app.post('/preferences/printer', async (request, response) => {
+    if (!request.body || typeof request.body.printer !== 'string') return response.status(400).json({ error: 'A printer is required.' });
+    try {
+      const printers = await fetchCollection(apiUrl, '/rest/printer');
+      if (!printers.some((printer) => printer._id === request.body.printer)) return response.status(400).json({ error: 'The selected printer is not available.' });
+      response.cookie('employee_printer', request.body.printer, { maxAge: 31536000000, httpOnly: true, sameSite: 'lax', path: '/' }).status(204).end();
+    } catch (error) {
+      console.error(`Unable to save employee printer preference: ${error.message}`);
+      response.status(503).json({ error: 'Unable to save printer preference. Please try again later.' });
     }
   });
 

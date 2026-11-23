@@ -21,8 +21,8 @@
         <div class="grid">
           <label>Printer
             <select name="printer" required>
-              <option value="" selected disabled>Select a printer</option>
-              <% printers.forEach((printer) => { %><option value="<%= printer._id %>"><%= printer.name || printer._id %></option><% }); %>
+              <option value="" disabled <%= selectedPrinterId ? '' : 'selected' %>>Select a printer</option>
+              <% printers.forEach((printer) => { %><option value="<%= printer._id %>" <%= printer._id === selectedPrinterId ? 'selected' : '' %>><%= printer.name || printer._id %></option><% }); %>
             </select>
           </label>
           <label>Label Template
@@ -54,5 +54,16 @@
       </form>
     <% } %>
   </main>
+  <% if (!errorMessage) { %>
+    <script>
+      document.querySelector('select[name="printer"]').addEventListener('change', function(event) {
+        fetch('/preferences/printer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ printer: event.target.value })
+        });
+      });
+    </script>
+  <% } %>
 </body>
 </html>

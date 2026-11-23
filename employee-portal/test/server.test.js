@@ -12,14 +12,24 @@ function close(server) {
   return new Promise((resolve) => server.close(resolve));
 }
 
-function get(port) {
+function request(port, method, path, body, headers = {}) {
   return new Promise((resolve, reject) => {
-    http.get({ hostname: '127.0.0.1', port, path: '/' }, (response) => {
-      let body = '';
+    const payload = body ? JSON.stringify(body) : null;
+    const request = http.request({
+      hostname: '127.0.0.1',
+      port,
+      method,
+      path,
+      headers: payload ? { ...headers, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : headers
+    }, (response) => {
+      let responseBody = '';
       response.setEncoding('utf8');
-      response.on('data', (chunk) => { body += chunk; });
-      response.on('end', () => resolve({ status: response.statusCode, body }));
-    }).on('error', reject);
+      response.on('data', (chunk) => { responseBody += chunk; });
+      response.on('end', () => resolve({ status: response.statusCode, body: responseBody, headers: response.headers }));
+    });
+    request.on('error', reject);
+    if (payload) request.write(payload);
+    request.end();
   });
 }
 
@@ -37,13 +47,23 @@ function get(port) {
   const portal = await listen(http.createServer(createApp({ apiUrl: `http://127.0.0.1:${upstreamPort}` })));
 
   try {
-    const response = await get(portal.address().port);
-    assert.strictEqual(response.status, 200);
-    assert.match(response.body, /VIRA Label Printing/);
-    assert.match(response.body, /ZT610/);
-    assert.match(response.body, /Shipping Label/);
-    assert.match(response.body, /name="partNo"/);
-    assert.match(response.body, /name="copies"/);
+    const firstPage = await request(portal.address().port, 'GET', '/');
+    assert.strictEqual(firstPage.status, 200);
+    assert.match(firstPage.body, /VIRA Label Printing/);
+    assert.match(firstPage.body, /ZT610/);
+    assert.match(firstPage.body, /Shipping Label/);
+    assert.match(firstPage.body, /name="partNo"/);
+    assert.match(firstPage.body, /name="copies"/);
+
+    const preference = await request(portal.address().port, 'POST', '/preferences/printer', { printer: 'printer-1' });
+    assert.strictEqual(preference.status, 204);
+    assert.match(preference.headers['set-cookie'][0], /^employee_printer=printer-1;/);
+
+    const selectedPage = await request(portal.address().port, 'GET', '/', null, { Cookie: preference.headers['set-cookie'][0] });
+    assert.match(selectedPage.body, /<option value="printer-1" selected>ZT610<\/option>/);
+
+    const invalidPreference = await request(portal.address().port, 'POST', '/preferences/printer', { printer: 'unknown' });
+    assert.strictEqual(invalidPreference.status, 400);
   } finally {
     await close(portal);
     await close(upstream);
@@ -51,7 +71,7 @@ function get(port) {
 
   const unavailable = await listen(http.createServer(createApp({ apiUrl: 'http://127.0.0.1:1' })));
   try {
-    const response = await get(unavailable.address().port);
+    const response = await request(unavailable.address().port, 'GET', '/');
     assert.strictEqual(response.status, 503);
     assert.match(response.body, /Unable to load printers and label templates/);
   } finally {
