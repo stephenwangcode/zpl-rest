@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VIRA Label Printing</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="page">
+    <header>
+      <p class="eyebrow">VIRA</p>
+      <h1>Label Printing</h1>
+      <p class="intro">Enter the shipment details and select the approved printer and label template.</p>
+    </header>
+
+    <% if (errorMessage) { %>
+      <section class="notice" role="alert"><%= errorMessage %></section>
+    <% } else { %>
+      <form>
+        <div class="grid">
+          <label>Printer
+            <select name="printer" required>
+              <option value="" selected disabled>Select a printer</option>
+              <% printers.forEach((printer) => { %><option value="<%= printer._id %>"><%= printer.name || printer._id %></option><% }); %>
+            </select>
+          </label>
+          <label>Label Template
+            <select name="label" required>
+              <option value="" selected disabled>Select a label template</option>
+              <% labels.forEach((label) => { %><option value="<%= label._id %>"><%= label.name || label._id %></option><% }); %>
+            </select>
+          </label>
+          <label>Part No
+            <input name="partNo" type="text" required maxlength="100" placeholder="163-0002-001">
+          </label>
+          <label>Description
+            <textarea name="description" required maxlength="500" rows="3" placeholder="CVS Beauty Creations Hybrid Endcap - Graphic Prints_Samples"></textarea>
+          </label>
+          <label>Qty
+            <input name="qty" type="number" required min="1" step="1" placeholder="70">
+          </label>
+          <label>Attn
+            <input name="attn" type="text" required maxlength="100" placeholder="Amanda Burkey">
+          </label>
+          <label>Shipping Date
+            <input name="shippingDate" type="date" required>
+          </label>
+          <label>Copies
+            <input name="copies" type="number" required min="1" step="1" value="1">
+          </label>
+        </div>
+        <button type="submit" disabled>Printing will be available in Phase 2</button>
+      </form>
+    <% } %>
+  </main>
+</body>
+</html>

@@ -7,3 +7,14 @@ services:
       - 8110:8000
     volumes:
       - ./volumes:/app/db
+
+  employee-portal:
+    build:
+      context: .
+      dockerfile: employee-portal/Dockerfile
+    restart: always
+    ports:
+      - 8100:8100
+    environment:
+      PORT: 8100
+      ZPL_API_URL: ${ZPL_API_URL:-http://10.1.1.246:8110}
