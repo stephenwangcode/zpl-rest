@@ -12,4 +12,5 @@ input, select, textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1;
 textarea { resize: vertical; }
 button { padding: 12px 16px; border: 0; border-radius: 6px; background: #93c5fd; color: #1e3a8a; cursor: not-allowed; }
 .notice { padding: 16px; border-radius: 6px; background: #fef2f2; color: #991b1b; }
+#preview-image { display: block; max-width: 100%; height: auto; margin-top: 20px; }
 @media (max-width: 640px) { .page { margin: 0; min-height: 100vh; border-radius: 0; padding: 24px; } .grid { grid-template-columns: 1fr; } }
