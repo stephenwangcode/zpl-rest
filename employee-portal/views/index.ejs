@@ -27,8 +27,8 @@
           </label>
           <label>Label Template
             <select name="label" required>
-              <option value="" selected disabled>Select a label template</option>
-              <% labels.forEach((label) => { %><option value="<%= label._id %>"><%= label.name || label._id %></option><% }); %>
+              <option value="" disabled <%= selectedLabelId ? '' : 'selected' %>>Select a label template</option>
+              <% labels.forEach((label) => { %><option value="<%= label._id %>" <%= label._id === selectedLabelId ? 'selected' : '' %>><%= label.name || label._id %></option><% }); %>
             </select>
           </label>
           <label>Part No
@@ -70,7 +70,8 @@
       const api = async (url, options) => { const response = await fetch(url, options); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Request failed.'); return data; };
       printer.addEventListener('change', (event) => { fetch('/preferences/printer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ printer: event.target.value }) }); });
       async function loadFields() { try { const data = await api(`/form-fields/${encodeURIComponent(label.value)}`); fieldNames = data.fields; dynamic.innerHTML = ''; data.fields.forEach((name) => { if ([...form.elements].some((element) => element.name === name)) return; const field = document.createElement('label'); field.textContent = name; const input = document.createElement('input'); input.name = name; input.required = true; input.maxLength = 500; field.append(input); dynamic.append(field); }); } catch (error) { status.textContent = error.message; } }
-      label.addEventListener('change', loadFields);
+      label.addEventListener('change', () => { fetch('/preferences/label', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: label.value }) }); loadFields(); });
+      if (label.value) loadFields();
       document.querySelector('#preview').addEventListener('click', async () => { if (!form.reportValidity()) return; try { const data = await api('/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload()) }); document.querySelector('#preview-image').src = `data:image/png;base64,${data.img}`; status.textContent = ''; } catch (error) { status.textContent = error.message; } });
       form.addEventListener('submit', async (event) => { event.preventDefault(); if (!form.reportValidity()) return; try { const data = await api('/print', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload()) }); status.textContent = `${data.jobs.length} print job(s) sent.`; history(); } catch (error) { status.textContent = error.message; } });
       async function history() { try { const jobs = await api('/history'); const box = document.querySelector('#history'); box.innerHTML = ''; jobs.forEach((job) => { const button = document.createElement('button'); button.type = 'button'; button.textContent = `${job.date}: ${job.label_name}`; button.onclick = async () => { printer.value = job.printer_id; label.value = job.label_id; await loadFields(); Object.entries(job.data).forEach(([name, value]) => { const input = [...form.elements].find((element) => element.name === name); if (input) input.value = value; }); }; box.append(button); }); } catch (error) { status.textContent = error.message; } }

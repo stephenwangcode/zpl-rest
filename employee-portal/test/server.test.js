@@ -66,8 +66,12 @@ function request(port, method, path, body, headers = {}) {
     assert.strictEqual(preference.status, 204);
     assert.match(preference.headers['set-cookie'][0], /^employee_printer=printer-1;/);
 
-    const selectedPage = await request(portal.address().port, 'GET', '/', null, { Cookie: preference.headers['set-cookie'][0] });
+    const labelPreference = await request(portal.address().port, 'POST', '/preferences/label', { label: 'label-1' });
+    assert.strictEqual(labelPreference.status, 204);
+    assert.match(labelPreference.headers['set-cookie'][0], /^employee_label=label-1;/);
+    const selectedPage = await request(portal.address().port, 'GET', '/', null, { Cookie: `${preference.headers['set-cookie'][0]}; ${labelPreference.headers['set-cookie'][0]}` });
     assert.match(selectedPage.body, /<option value="printer-1" selected>ZT610<\/option>/);
+    assert.match(selectedPage.body, /<option value="label-1" selected>Shipping Label<\/option>/);
 
     const invalidPreference = await request(portal.address().port, 'POST', '/preferences/printer', { printer: 'unknown' });
     assert.strictEqual(invalidPreference.status, 400);
